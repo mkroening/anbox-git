@@ -1,0 +1,24 @@
+From c20253e6ca939e5e430856e39dc32d3b9846baf5 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Martin=20Kr=C3=B6ning?= <mkroening@posteo.net>
+Date: Wed, 20 May 2020 20:51:29 +0200
+Subject: [PATCH] Desktop Entry: Adjust icon location
+
+---
+ data/desktop/appmgr.desktop | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/data/desktop/appmgr.desktop b/data/desktop/appmgr.desktop
+index 248acde..b05160b 100644
+--- a/data/desktop/appmgr.desktop
++++ b/data/desktop/appmgr.desktop
+@@ -3,6 +3,6 @@ Name=Anbox Application Manager
+ GenericName=Anbox Application Manager
+ Version=1.0
+ Type=Application
+-Icon=${SNAP}/meta/gui/icon.png
++Icon=anbox
+ Exec=anbox launch --package=org.anbox.appmgr --component=org.anbox.appmgr.AppViewActivity
+ Terminal=false
+-- 
+2.26.2
+

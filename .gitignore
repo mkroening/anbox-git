@@ -1,0 +1,8 @@
+/anbox/
+/backward-cpp/
+/cpu_features/
+
+/pkg/
+/src/
+/*.tar.*
+/*.log

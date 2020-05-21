@@ -1,85 +1,86 @@
 # Maintainer: Iwan Timmer <irtimmer@gmail.com>
-
-pkgname=('anbox-git' 'anbox-modules-dkms-git')
+# Contributor: Martin Kröning <m.kroening@hotmail.de>
 _pkgname=anbox
-pkgver=r1096.ea2b7a3
+pkgname=anbox-git
+pkgver=r1202.576ed3d
 pkgrel=1
-epoch=1
-arch=('x86_64')
-url="http://anbox.io/"
-license=('GPL3')
-makedepends=('cmake' 'git' 'glm' 'lxc' 'sdl2_image' 'protobuf' 'boost' 'properties-cpp' 'gtest' 'python2')
-source=("git+https://github.com/anbox/anbox.git"
-	"git+https://github.com/anbox/anbox-modules.git"
-	'anbox-container-manager.service'
-	'anbox-session-manager.service'
-	'99-anbox.rules'
-	'anbox.conf'
-	'anbox.desktop'
-	'anbox-bridge.network'
-	'anbox-bridge.netdev')
+pkgdesc="Android in a Box - An application-based approach to run a full Android system"
+arch=(x86_64)
+url=https://anbox.io/
+license=(GPL3)
+depends=(boost-libs hicolor-icon-theme lxc protobuf sdl2_image)
+makedepends=(boost cmake dbus git glm gmock gtest ninja properties-cpp systemd)
+optdepends=("anbox-modules-dkms: Anbox requires the binder and ashmem kernel drivers.")
+provides=($_pkgname)
+conflicts=($_pkgname)
+source=(git+https://github.com/mwkroening/$_pkgname.git#branch=impl
+        git+https://github.com/bombela/backward-cpp.git
+        git+https://github.com/google/cpu_features.git
+        0001-Desktop-Entry-Adjust-icon-location.patch
+        anbox-container-manager.sh
+        anbox-container-manager.service
+        anbox.netdev
+        anbox.network)
 sha256sums=('SKIP'
             'SKIP'
-            '5be94b63dc30d141f15ca7d1be6e3e81f26ef33f844614975537562f5d08236c'
-            '1f22dbb5a3ca6925bbf62899cd0f0bbaa0b77c879adcdd12ff9d43adfa61b1d8'
-            '210eb93342228168f7bb632c8b93d9bfda6f53f62459a6b74987fa1e17530475'
-            '3e07dc524a827c1651857cce28a06c1565bc5188101c140ed213bbafedc5abff'
-            '7332d09865be553a259a53819cebddd21f661c7a251d78c2f46acd75c66676b6'
-            '44899328725667041e6e84912da81c1d0147b708006eb2c2bb6503f271629ff0'
-            '559190df4d6d595480b30d8b13b862081fc4aac52790e33eb24cf7fbcb8003b8')
-
-pkgver() {
-  cd "$srcdir/$_pkgname"
-  ( set -o pipefail
-    git describe --long 2>/dev/null | sed 's/\([^-]*-g\)/r\1/;s/-/./g' ||
-    printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
-  )
-}
+            'SKIP'
+            '3ab3c6ef3de7d2c056339c31d026ae4a5e4b17415835c480a46fb39ca52c653d'
+            '469b33a1a29f0472ead7c8eba772eedc3a2a4aeadca2bed85a7d92f10f90d8f1'
+            '3e8f0a7e2e881620c00dcaebbb436f5f1db2d64ea84533affb577a7b7714e34c'
+            '559190df4d6d595480b30d8b13b862081fc4aac52790e33eb24cf7fbcb8003b8'
+            'ffd7e845f0993572a4d3443bcec3742ffd5006b4ad73414f59e833f490f8fcce')
 
 prepare() {
-  cd "$srcdir/${_pkgname}"
+    cd $_pkgname
 
-  # Don't build tests
-  truncate -s 0 cmake/FindGMock.cmake
-  truncate -s 0 tests/CMakeLists.txt
+    git submodule init
+    git config submodule.external/backward-cpp.url "$srcdir"/backward-cpp
+    git config submodule.external/cpu_features.url "$srcdir"/cpu_features
+    git submodule update
+
+    patch -p1 -i "$srcdir"/0001-Desktop-Entry-Adjust-icon-location.patch
+}
+
+pkgver() {
+    cd $_pkgname
+    printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
 }
 
 build() {
-  mkdir -p "$srcdir/${_pkgname}/build"
-  cd "$srcdir/${_pkgname}/build"
+    cmake -G Ninja -S $_pkgname -B build \
+        -DANBOX_VERSION=$pkgver \
+        -DBINDERFS_PATH=/var/lib/anbox/common/binderfs \
+        -DCMAKE_BUILD_TYPE=None \
+        -DCMAKE_C_FLAGS="$CPPFLAGS $CFLAGS" \
+        -DCMAKE_CXX_FLAGS="$CPPFLAGS $CXXFLAGS" \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -Wno-dev
 
-  cmake .. -DCMAKE_INSTALL_LIBDIR=/usr/lib -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_CXX_FLAGS="-Wno-error=implicit-fallthrough -Wno-error=missing-field-initializers" -DCMAKE_BUILD_TYPE=Release
-  make
+    cmake --build build
 }
 
-package_anbox-git() {
-  depends=('lxc' 'sdl2_image' 'protobuf' 'anbox-image' 'libsystemd' 'boost-libs')
-  optdepends=('anbox-modules-dkms-git: Required Android kernel modules')
-  pkgdesc="Running Android in a container"
-
-  cd "$srcdir/${_pkgname}"
-  make -C build DESTDIR="$pkgdir" install
-
-  install -Dm 644 -t $pkgdir/usr/lib/systemd/system $srcdir/anbox-container-manager.service
-  install -Dm 644 -t $pkgdir/usr/lib/systemd/user $srcdir/anbox-session-manager.service
-  install -Dm 644 $srcdir/anbox-bridge.network $pkgdir/usr/lib/systemd/network/80-anbox-bridge.network
-  install -Dm 644 $srcdir/anbox-bridge.netdev $pkgdir/usr/lib/systemd/network/80-anbox-bridge.netdev
-  install -Dm 644 -t $pkgdir/usr/lib/udev/rules.d $srcdir/99-anbox.rules
-  install -Dm 644 -t $pkgdir/usr/share/applications $srcdir/anbox.desktop
-  install -Dm 644 snap/gui/icon.png $pkgdir/usr/share/pixmaps/anbox.png
+check() {
+    cmake --build build --target test
 }
 
-package_anbox-modules-dkms-git() {
-  pkgdesc="Required kernel module sources for Android"
-  depends=('dkms')
-  arch=('any')
+package() {
+    DESTDIR="$pkgdir" cmake --install build
 
-  cd "$srcdir/anbox-modules"
-  modules=(ashmem binder)
-  for mod in "${modules[@]}"; do
-    install -dm 755 $pkgdir/usr/src
-    cp -a $mod $pkgdir/usr/src/anbox-modules-$mod-$pkgver
-  done;
+    # Remove files from backward-cpp and cpu_features
+    rm "$pkgdir"/usr/bin/list_cpu_features
+    rm -r "$pkgdir"/usr/include
+    rm -r "$pkgdir"/usr/lib
 
-  install -Dm 644 -t $pkgdir/usr/lib/modules-load.d $srcdir/anbox.conf
+    # Container manager start script and service
+    install -Dm 755 anbox-container-manager.sh "$pkgdir"/usr/lib/systemd/scripts/anbox-container-manager
+    install -Dm 644 anbox-container-manager.service -t "$pkgdir"/usr/lib/systemd/system
+
+    # systemd-networkd bridge
+    install -Dm 644 anbox.netdev "$pkgdir"/usr/lib/systemd/network/80-anbox.netdev
+    install -Dm 644 anbox.network "$pkgdir"/usr/lib/systemd/network/80-anbox.network
+
+    cd $_pkgname
+    # Desktop integration
+    install -Dm 644 snap/gui/icon.png "$pkgdir"/usr/share/icons/hicolor/512x512/apps/anbox.png
+    install -Dm 644 data/desktop/appmgr.desktop "$pkgdir"/usr/share/applications/anbox-appmgr.desktop
 }
